@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Marcffy - The Build Club</title>
+<meta name="description" content="Acceso restringido. Solo entran los que construyen su propio camino.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#050604;
+    --lime:#c8f04c;
+    --lime-dim:#8fae3c;
+    --fg:#d9ddd3;
+    --muted:#5a5e55;
+    --err:#ff6b5e;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--fg);
+    font-family:'JetBrains Mono', ui-monospace, Menlo, monospace;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  #matrix{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    display:block;
+  }
+
+  .crt{
+    position:relative;
+    width:100vw;
+    height:100vh;
+    height:100dvh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:6vw 5vw;
+    z-index:1;
+  }
+  .crt::before{
+    content:"";
+    position:fixed; inset:0;
+    background:repeating-linear-gradient(
+      to bottom,
+      rgba(217,221,211,0.045) 0px,
+      rgba(217,221,211,0.045) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    mix-blend-mode:overlay;
+    pointer-events:none;
+    z-index:3;
+  }
+  .crt::after{
+    content:"";
+    position:fixed; inset:0;
+    background:radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.78) 100%);
+    pointer-events:none;
+    z-index:2;
+    animation:flicker 6s infinite;
+  }
+  @keyframes flicker{
+    0%,96%,100%{ opacity:1; }
+    97%{ opacity:0.94; }
+    98%{ opacity:1; }
+    99%{ opacity:0.88; }
+  }
+
+  .panel{
+    position:relative;
+    z-index:1;
+    width:100%;
+    max-width:660px;
+    background:rgba(5,6,4,0.62);
+    backdrop-filter:blur(3px);
+    -webkit-backdrop-filter:blur(3px);
+    border:1px solid rgba(200,240,76,0.15);
+    box-shadow:0 0 60px rgba(200,240,76,0.05);
+    padding:clamp(20px, 4vw, 40px);
+    max-height:82vh;
+    overflow-y:auto;
+    scrollbar-width:thin;
+    scrollbar-color:var(--lime-dim) transparent;
+  }
+
+  .term{
+    font-size:clamp(13.5px, 2.2vw, 16px);
+    line-height:1.75;
+  }
+  .term .line{
+    white-space:pre-wrap;
+    word-break:break-word;
+  }
+  .term .line .prompt{ color:var(--lime-dim); }
+  .term .line.hi{ color:var(--lime); text-shadow:0 0 10px rgba(200,240,76,0.45); }
+  .term .line.dim{ color:var(--muted); }
+  .term .line.err{ color:var(--err); }
+  .term .answered{ color:var(--lime-dim); font-style:italic; }
+
+  .cursor{
+    display:inline-block;
+    width:0.55em;
+    height:1em;
+    background:var(--lime);
+    vertical-align:text-bottom;
+    animation:blink 1s step-end infinite;
+  }
+  @keyframes blink{ 50%{ opacity:0; } }
+
+  .options{
+    display:flex;
+    gap:12px;
+    margin:14px 0 6px 1.4em;
+    flex-wrap:wrap;
+  }
+  .opt{
+    background:none;
+    border:1px solid var(--lime-dim);
+    color:var(--fg);
+    font:inherit;
+    font-size:13px;
+    letter-spacing:0.04em;
+    padding:9px 18px;
+    cursor:pointer;
+    transition:background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  }
+  .opt:hover, .opt:focus-visible{
+    background:var(--lime);
+    color:#0a0a0a;
+    border-color:var(--lime);
+    transform:translateY(-1px);
+  }
+  .opt:focus-visible{ outline:2px solid var(--fg); outline-offset:3px; }
+
+  .exec{
+    color:var(--lime);
+    font-weight:700;
+    cursor:pointer;
+    text-decoration:underline;
+    text-underline-offset:4px;
+    background:none;
+    border:none;
+    font:inherit;
+    padding:0;
+    text-shadow:0 0 12px rgba(200,240,76,0.5);
+  }
+  .exec:hover, .exec:focus-visible{ color:var(--fg); }
+  .exec:focus-visible{ outline:2px solid var(--lime); outline-offset:4px; }
+
+  .term input{
+    background:none;
+    border:none;
+    border-bottom:1px solid var(--lime-dim);
+    color:var(--lime);
+    font:inherit;
+    outline:none;
+    padding:2px 4px;
+    width:min(280px, 58vw);
+  }
+  .term input:focus{ border-color:var(--lime); }
+  .term input::placeholder{ color:var(--muted); }
+
+  .consent-line{
+    display:flex;
+    align-items:flex-start;
+    gap:8px;
+    color:var(--muted);
+    font-size:12px;
+    margin-top:6px;
+  }
+  .consent-line input[type="checkbox"]{ accent-color:var(--lime); margin-top:3px; width:auto; }
+  .consent-line a{ color:var(--fg); }
+
+  .idle{
+    position:relative;
+    z-index:1;
+    display:flex; align-items:center; justify-content:center;
+    flex-direction:column;
+    text-align:center;
+    cursor:pointer;
+  }
+  .idle .glitch{
+    font-size:clamp(12px,2vw,14px);
+    letter-spacing:0.15em;
+    text-transform:uppercase;
+    color:var(--muted);
+    position:relative;
+    display:inline-block;
+    margin-top:18px;
+  }
+  .idle .glitch::before,
+  .idle .glitch::after{
+    content:attr(data-text);
+    position:absolute; left:0; top:0; width:100%;
+    overflow:hidden; background:var(--bg); color:var(--lime);
+  }
+  .idle .glitch::before{ animation:gTop 4s infinite linear; }
+  .idle .glitch::after{ animation:gBot 4s infinite linear; }
+  @keyframes gTop{
+    0%,90%{clip-path:inset(0 0 100% 0);}
+    91%{clip-path:inset(0 0 55% 0); transform:translate(-2px);}
+    94%{clip-path:inset(30% 0 30% 0); transform:translate(2px);}
+    97%{clip-path:inset(0 0 80% 0);}
+    100%{clip-path:inset(0 0 100% 0);}
+  }
+  @keyframes gBot{
+    0%,88%{clip-path:inset(100% 0 0 0);}
+    89%{clip-path:inset(55% 0 0 0); transform:translate(2px);}
+    93%{clip-path:inset(30% 0 30% 0); transform:translate(-2px);}
+    96%{clip-path:inset(80% 0 0 0);}
+    100%{clip-path:inset(100% 0 0 0);}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .crt::after{ animation:none; }
+    .cursor{ animation:none; }
+    .idle .glitch::before, .idle .glitch::after{ animation:none; display:none; }
+  }
+
+  /* ---------- CIERRE DRAMÁTICO DEL PANEL ---------- */
+  .panel.crt-off{
+    animation:crtOff 0.55s cubic-bezier(.7,0,.9,1) forwards;
+  }
+  @keyframes crtOff{
+    0%{ transform:scale(1,1); opacity:1; filter:brightness(1); }
+    35%{ transform:scale(1.02,0.02); opacity:1; filter:brightness(3); }
+    60%{ transform:scale(0.4,0.005); opacity:1; filter:brightness(4); }
+    100%{ transform:scale(0,0.0005); opacity:0; filter:brightness(6); }
+  }
+
+  /* ---------- PORTAL ---------- */
+  .portal{
+    position:relative;
+    z-index:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:100%;
+  }
+  .portal-ring{
+    position:absolute;
+    width:min(70vw,420px);
+    height:min(70vw,420px);
+    border-radius:50%;
+    background:conic-gradient(from 0deg, transparent 0%, var(--lime) 18%, transparent 40%, transparent 60%, var(--lime) 78%, transparent 100%);
+    filter:blur(6px);
+    opacity:0;
+    z-index:0;
+  }
+  .portal-ring.spin{
+    animation:ringSpin 5s linear infinite, ringIn 0.7s ease forwards;
+  }
+  @keyframes ringSpin{ to{ transform:rotate(360deg); } }
+  @keyframes ringIn{ from{ opacity:0; transform:scale(0.2); } to{ opacity:0.55; transform:scale(1); } }
+
+  .portal-card{
+    position:relative;
+    z-index:1;
+    width:100%;
+    max-width:440px;
+    background:rgba(5,6,4,0.82);
+    backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+    border:1px solid rgba(200,240,76,0.35);
+    box-shadow:0 0 50px rgba(200,240,76,0.18), inset 0 0 30px rgba(200,240,76,0.05);
+    padding:clamp(24px,5vw,44px);
+    text-align:center;
+    opacity:0;
+    transform:scale(0.85);
+  }
+  .portal-card.in{
+    animation:cardIn 0.6s ease forwards;
+    animation-delay:0.25s;
+  }
+  @keyframes cardIn{ to{ opacity:1; transform:scale(1); } }
+
+  .portal-eyebrow{
+    font-size:11px;
+    letter-spacing:0.3em;
+    text-transform:uppercase;
+    color:var(--lime);
+    margin-bottom:10px;
+  }
+  .portal-title{
+    font-size:clamp(20px,3.6vw,28px);
+    color:var(--fg);
+    margin-bottom:26px;
+    line-height:1.3;
+  }
+  .p-field{
+    text-align:left;
+    margin-bottom:18px;
+  }
+  .p-field label{
+    display:block;
+    font-size:11px;
+    color:var(--muted);
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  .p-field .field{
+    width:100%;
+    background:transparent;
+    border:none;
+    border-bottom:1px solid var(--lime-dim);
+    color:var(--lime);
+    font-family:'JetBrains Mono', monospace;
+    font-size:15px;
+    padding:8px 2px;
+    outline:none;
+  }
+  .p-field .field:focus{ border-color:var(--lime); }
+  .p-field .field::placeholder{ color:var(--muted); }
+
+  .p-slider input[type="range"]{
+    width:100%;
+    accent-color:var(--lime);
+    margin-top:6px;
+  }
+  .p-slider-value{
+    text-align:right;
+    color:var(--lime);
+    font-size:13px;
+    margin-top:4px;
+  }
+
+  .error{ color:var(--err); font-size:12px; min-height:16px; margin-top:4px; text-align:left; }
+
+  .btn-portal{
+    margin-top:14px;
+    width:100%;
+    background:transparent;
+    border:1px solid var(--lime);
+    color:var(--lime);
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:0.15em;
+    text-transform:uppercase;
+    padding:15px;
+    cursor:pointer;
+    transition:background 0.25s ease, color 0.25s ease;
+  }
+  .btn-portal:hover, .btn-portal:focus-visible{
+    background:var(--lime);
+    color:#0a0a0a;
+  }
+  .btn-portal:focus-visible{ outline:2px solid var(--fg); outline-offset:4px; }
+
+  @media (prefers-reduced-motion: reduce){
+    .panel.crt-off{ animation:none; opacity:0; }
+    .portal-ring.spin{ animation:none; opacity:0.4; }
+    .portal-card.in{ animation:none; opacity:1; transform:scale(1); }
+  }
+
+  /* ---------- ERROR / RECHAZO ---------- */
+  .flash-red{
+    position:fixed; inset:0;
+    background:var(--err);
+    opacity:0;
+    z-index:20;
+    pointer-events:none;
+  }
+  .flash-red.active{ animation:flashRed 0.45s ease; }
+  @keyframes flashRed{
+    0%{ opacity:0; }
+    25%{ opacity:0.9; }
+    100%{ opacity:0; }
+  }
+
+  .flash-lime{
+    position:fixed; inset:0;
+    background:var(--lime);
+    opacity:0;
+    z-index:20;
+    pointer-events:none;
+  }
+  .flash-lime.active{ animation:flashLime 0.45s ease; }
+  @keyframes flashLime{
+    0%{ opacity:0; }
+    25%{ opacity:0.5; }
+    100%{ opacity:0; }
+  }
+
+  .reject-card.tone-lime{
+    border-color: rgba(200,240,76,0.45);
+    box-shadow:0 0 50px rgba(200,240,76,0.18), inset 0 0 30px rgba(200,240,76,0.06);
+  }
+  .reject-eyebrow.tone-lime-text{ color:var(--lime); }
+  .btn-reject.tone-lime{
+    border-color:var(--lime);
+    color:var(--lime);
+  }
+  .btn-reject.tone-lime:hover, .btn-reject.tone-lime:focus-visible{
+    background:var(--lime);
+    color:#0a0a0a;
+  }
+
+  .reject{
+    position:relative;
+    z-index:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:100%;
+  }
+  .reject-card{
+    width:100%;
+    max-width:440px;
+    background:rgba(10,4,4,0.82);
+    backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+    border:1px solid rgba(255,107,94,0.45);
+    box-shadow:0 0 50px rgba(255,107,94,0.18), inset 0 0 30px rgba(255,107,94,0.06);
+    padding:clamp(24px,5vw,44px);
+    text-align:center;
+    opacity:0;
+    transform:scale(0.85);
+    animation:cardIn 0.5s ease forwards;
+  }
+  .reject-eyebrow{
+    font-size:11px;
+    letter-spacing:0.3em;
+    text-transform:uppercase;
+    color:var(--err);
+    margin-bottom:10px;
+  }
+  .reject-title{
+    font-size:clamp(20px,3.6vw,28px);
+    color:var(--fg);
+    margin-bottom:18px;
+    line-height:1.3;
+  }
+  .reject-sub{
+    color:var(--muted);
+    font-size:14px;
+    line-height:1.7;
+    margin-bottom:28px;
+  }
+  .reject-actions{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  .btn-reject{
+    background:transparent;
+    border:1px solid var(--err);
+    color:var(--err);
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:12px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    padding:13px 20px;
+    cursor:pointer;
+    transition:background 0.2s ease, color 0.2s ease;
+    flex:1 1 auto;
+  }
+  .btn-reject:hover, .btn-reject:focus-visible{
+    background:var(--err);
+    color:#0a0a0a;
+  }
+  .btn-reject.ghost{
+    border-color:var(--muted);
+    color:var(--muted);
+  }
+  .btn-reject.ghost:hover{
+    background:var(--muted);
+    color:#0a0a0a;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="matrix"></canvas>
+
+<div class="crt" id="crt">
+  <div class="idle" id="idle">
+    <span class="cursor"></span>
+    <span class="glitch" data-text="pulsa para acceder">pulsa para acceder</span>
+  </div>
+
+  <div class="panel" id="panel" style="display:none">
+    <div class="term" id="term"></div>
+  </div>
+
+  <div class="portal" id="portal" style="display:none">
+    <div class="portal-ring"></div>
+    <div class="portal-card" id="portal-card">
+      <p class="portal-eyebrow">acceso a la comunidad exclusiva</p>
+      <h2 class="portal-title">The Build Club</h2>
+      <form id="form-portal" novalidate>
+        <div class="p-field">
+          <label for="p-name">nombre</label>
+          <input class="field" type="text" id="p-name" placeholder="tu nombre" autocomplete="given-name" required>
+        </div>
+        <div class="p-field">
+          <label for="p-email">email</label>
+          <input class="field" type="email" id="p-email" placeholder="tu@email.com" autocomplete="email" required>
+        </div>
+        <div class="p-field">
+          <label for="p-phone">número</label>
+          <input class="field" type="tel" id="p-phone" placeholder="+34 600 000 000" autocomplete="tel" required>
+        </div>
+        <div class="p-field">
+          <label for="p-age">edad</label>
+          <input class="field" type="number" id="p-age" placeholder="25" min="14" max="99" required>
+        </div>
+        <div class="p-field p-slider">
+          <label for="p-commit">¿qué tan comprometido estás con cambiar tu situación?</label>
+          <input type="range" id="p-commit" min="0" max="100" value="50">
+          <div class="p-slider-value"><span id="p-commit-val">50</span>%</div>
+        </div>
+        <label class="consent-line">
+          <input type="checkbox" id="p-consent" required>
+          <span>acepto la <a href="#" target="_blank" rel="noopener">política de privacidad</a> y recibir emails de Marcffyy</span>
+        </label>
+        <p class="error" id="p-error"></p>
+        <button class="btn-portal" type="submit">entrar a la comunidad</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="flash-red" id="flash-red"></div>
+  <div class="flash-lime" id="flash-lime"></div>
+
+  <div class="reject" id="reject" style="display:none">
+    <div class="reject-card" id="reject-card"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const crt = document.getElementById('crt');
+  const idle = document.getElementById('idle');
+  const panel = document.getElementById('panel');
+  const term = document.getElementById('term');
+  const portal = document.getElementById('portal');
+  const portalCard = document.getElementById('portal-card');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------------------------------------------------------------
+  // FONDO: lluvia de código (matriz), corre siempre de fondo
+  // ---------------------------------------------------------------
+  const canvas = document.getElementById('matrix');
+  const ctx = canvas.getContext('2d');
+  const glyphs = '01アイウエオカキクケコサシスセソ0123456789ABCDEF{}<>/*#$'.split('');
+  let cols, drops;
+  const fontSize = 15;
+
+  function resize(){
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    cols = Math.floor(canvas.width / fontSize);
+    drops = new Array(cols).fill(0).map(()=> Math.random() * -50);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function drawMatrix(){
+    ctx.fillStyle = 'rgba(5,6,4,0.10)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = fontSize + 'px monospace';
+    for(let i=0; i<cols; i++){
+      const char = glyphs[Math.floor(Math.random()*glyphs.length)];
+      const y = drops[i] * fontSize;
+      ctx.fillStyle = Math.random() < 0.03 ? 'rgba(217,221,211,0.7)' : 'rgba(200,240,76,0.45)';
+      ctx.fillText(char, i * fontSize, y);
+      if(y > canvas.height && Math.random() > 0.975){ drops[i] = 0; }
+      drops[i]++;
+    }
+  }
+  if(!reduceMotion){
+    setInterval(drawMatrix, 45);
+  } else {
+    ctx.fillStyle = '#050604';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
+
+  // ---------------------------------------------------------------
+  // GUION: líneas automáticas + preguntas con ramificación
+  // ---------------------------------------------------------------
+  const sequence = [
+    { type:'line', text:'iniciando entrada a The Build Club...', cls:'dim' },
+    { type:'line', text:'cargando perfil de usuario...', cls:'dim' },
+    { type:'line', text:'perfil no encontrado.', cls:'' },
+    { type:'line', text:'el 97% de la gente elige la ruta segura.', cls:'' },
+    { type:'line', text:'estudios. oposición. nómina. jubilación.', cls:'dim' },
+    { type:'line', text:'tú estás aquí porque no encajas en esa lista.', cls:'hi' },
+    { type:'line', text:'acceso a este sistema: restringido.', cls:'' },
+    { type:'line', text:'iniciando verificación de intención...', cls:'dim' },
+    { type:'question', text:'¿actúas o solo lo piensas?',
+      options:[
+        { label:'actúo', response:'bien. eso te pone en el grupo que sí construye.' },
+        { label:'lo pienso', response:'la mayoría se queda pensando. todavía puedes cambiar de bando.' }
+      ]
+    },
+    { type:'question', text:'¿estás dispuesto a enfocarte, trabajar y tomar acción de verdad aunque sea difícil?',
+      options:[
+        { label:'sí', response:'bien. eso es lo único que de verdad separa a quien construye de quien solo lo intenta un día.' },
+        { label:'no', reject:true }
+      ]
+    },
+    { type:'question', text:'¿quieres empezar a tomar acción ya, o sigues esperando el momento?',
+      options:[
+        { label:'acción ya', response:'bien. el que actúa ya, ya va por delante del 90%.' },
+        { label:'esperando', warn:true }
+      ]
+    },
+    { type:'line', text:'verificación completa.', cls:'dim' },
+    { type:'line', text:'intención: confirmada.', cls:'hi', title:'MARCFFYY // COMUNIDAD' },
+    { type:'line', text:'es la puerta a una comunidad cerrada de gente construyendo en solitario.', cls:'' },
+    { type:'line', text:'dentro comparto en tiempo real:', cls:'' },
+    { type:'line', text:'– cómo levanto cada proyecto, semana a semana', cls:'dim' },
+    { type:'line', text:'– las cifras reales, incluidas las que fracasan', cls:'dim' },
+    { type:'line', text:'– el proceso exacto para vender lo que construyo', cls:'dim' },
+    { type:'line', text:'– cómo empezar de cero hasta tener un negocio real que funciona', cls:'dim' },
+  ];
+
+  let seqIndex = 0;
+  let typing = false;
+  let currentLineEl = null;
+  let currentFullText = '';
+  let typeTimer = null;
+  let sessionId = 0;
+  const AUTO_DELAY = 480;
+
+  function startBoot(){
+    idle.style.display = 'none';
+    panel.style.display = 'block';
+    runNext();
+  }
+
+  function runNext(){
+    if(seqIndex >= sequence.length){
+      renderExecPrompt();
+      return;
+    }
+    const item = sequence[seqIndex++];
+    if(item.title){ document.title = item.title; }
+    const mySession = sessionId;
+    if(item.type === 'line'){
+      typeLine(item.text, item.cls, function(){
+        setTimeout(function(){
+          if(mySession === sessionId) runNext();
+        }, AUTO_DELAY);
+      });
+    } else if(item.type === 'question'){
+      typeLine(item.text, '', function(){
+        if(mySession === sessionId) renderOptions(item.options);
+      });
+    }
+  }
+
+  function typeLine(text, cls, onDone){
+    const mySession = sessionId;
+    const row = document.createElement('div');
+    row.className = 'line ' + (cls || '');
+    const promptSpan = document.createElement('span');
+    promptSpan.className = 'prompt';
+    promptSpan.textContent = '> ';
+    row.appendChild(promptSpan);
+    const textSpan = document.createElement('span');
+    row.appendChild(textSpan);
+    const cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    row.appendChild(cursor);
+    term.appendChild(row);
+    panel.scrollTop = panel.scrollHeight;
+
+    currentLineEl = { row, textSpan, cursor };
+    currentFullText = text;
+    typing = true;
+
+    let i = 0;
+    clearInterval(typeTimer);
+    typeTimer = setInterval(function(){
+      if(mySession !== sessionId){
+        clearInterval(typeTimer);
+        return;
+      }
+      i++;
+      textSpan.textContent = text.slice(0, i);
+      panel.scrollTop = panel.scrollHeight;
+      if(i >= text.length){
+        clearInterval(typeTimer);
+        typing = false;
+        cursor.remove();
+        if(onDone) onDone();
+      }
+    }, 22 + Math.random()*12);
+  }
+
+  function skipTyping(){
+    if(typing && currentLineEl){
+      clearInterval(typeTimer);
+      typing = false;
+      currentLineEl.textSpan.textContent = currentFullText;
+      currentLineEl.cursor.remove();
+    }
+  }
+
+  crt.addEventListener('click', function(e){
+    if(idle.style.display !== 'none'){ startBoot(); return; }
+    if(e.target.closest('input') || e.target.closest('.exec') || e.target.closest('.opt')) return;
+    skipTyping();
+  });
+
+  function renderOptions(options){
+    const wrap = document.createElement('div');
+    wrap.className = 'options';
+    options.forEach(function(opt){
+      const btn = document.createElement('button');
+      btn.className = 'opt';
+      btn.textContent = opt.label;
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        const mySession = sessionId;
+        const chosen = document.createElement('div');
+        chosen.className = 'line answered';
+        chosen.textContent = '> ' + opt.label;
+        wrap.replaceWith(chosen);
+        if(opt.reject){
+          triggerRejection();
+          return;
+        }
+        if(opt.warn){
+          triggerWaiting();
+          return;
+        }
+        typeLine(opt.response, 'dim', function(){
+          setTimeout(function(){
+            if(mySession === sessionId) runNext();
+          }, AUTO_DELAY);
+        });
+      });
+      wrap.appendChild(btn);
+    });
+    term.appendChild(wrap);
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  // ---------------------------------------------------------------
+  // RECHAZO DRAMÁTICO (si responde 'no' a la pregunta de compromiso)
+  // ---------------------------------------------------------------
+  const reject = document.getElementById('reject');
+  const rejectCard = document.getElementById('reject-card');
+  const flashRed = document.getElementById('flash-red');
+  const flashLime = document.getElementById('flash-lime');
+
+  function triggerRejection(){
+    flashRed.classList.add('active');
+    panel.classList.add('crt-off');
+    setTimeout(function(){
+      flashRed.classList.remove('active');
+      panel.style.display = 'none';
+      panel.classList.remove('crt-off');
+      reject.style.display = 'flex';
+      renderRejectChoice();
+    }, reduceMotion ? 0 : 550);
+  }
+
+  function renderRejectChoice(){
+    rejectCard.className = 'reject-card';
+    rejectCard.innerHTML =
+      '<p class="reject-eyebrow">error</p>' +
+      '<h2 class="reject-title">si no estás dispuesto, esta comunidad no es para ti.</h2>' +
+      '<p class="reject-sub">The Build Club es para gente que actúa aunque sea difícil. Sin eso, no tiene sentido que entres.</p>' +
+      '<div class="reject-actions">' +
+        '<button class="btn-reject" id="btn-retry">volver a la iniciación</button>' +
+        '<button class="btn-reject ghost" id="btn-leave">salir definitivamente</button>' +
+      '</div>';
+    document.getElementById('btn-retry').addEventListener('click', function(e){
+      e.stopPropagation();
+      restartExperience();
+    });
+    document.getElementById('btn-leave').addEventListener('click', function(e){
+      e.stopPropagation();
+      renderRejectLeave();
+    });
+  }
+
+  function triggerWaiting(){
+    flashLime.classList.add('active');
+    panel.classList.add('crt-off');
+    setTimeout(function(){
+      flashLime.classList.remove('active');
+      panel.style.display = 'none';
+      panel.classList.remove('crt-off');
+      reject.style.display = 'flex';
+      renderWaitingChoice();
+    }, reduceMotion ? 0 : 550);
+  }
+
+  function renderWaitingChoice(){
+    rejectCard.className = 'reject-card tone-lime';
+    rejectCard.innerHTML =
+      '<p class="reject-eyebrow tone-lime-text">esperando</p>' +
+      '<h2 class="reject-title">¿vas a seguir esperando?</h2>' +
+      '<p class="reject-sub">si vas a esperar, dentro del club esto no es para ti. aquí solo entra gente que actúa ya.</p>' +
+      '<div class="reject-actions">' +
+        '<button class="btn-reject tone-lime" id="btn-retry-wait">volver a la iniciación para tomar acción ya</button>' +
+        '<button class="btn-reject ghost" id="btn-leave-wait">salir definitivamente</button>' +
+      '</div>';
+    document.getElementById('btn-retry-wait').addEventListener('click', function(e){
+      e.stopPropagation();
+      restartExperience();
+    });
+    document.getElementById('btn-leave-wait').addEventListener('click', function(e){
+      e.stopPropagation();
+      renderRejectLeave();
+    });
+  }
+
+  function renderRejectLeave(){
+    rejectCard.innerHTML =
+      '<p class="reject-eyebrow">hasta luego</p>' +
+      '<h2 class="reject-title">vuelve cuando estés listo de verdad.</h2>' +
+      '<p class="reject-sub">La puerta no desaparece. Solo se abre para quien está dispuesto a sostenerlo, no solo a desearlo.</p>';
+  }
+
+  function restartExperience(){
+    sessionId++;
+    clearInterval(typeTimer);
+    typing = false;
+    currentLineEl = null;
+    reject.style.display = 'none';
+    term.innerHTML = '';
+    seqIndex = 0;
+    document.title = 'Marcffy - The Build Club';
+    panel.style.display = 'block';
+    runNext();
+  }
+
+  // ---------------------------------------------------------------
+  // EJECUTAR ACCESO
+  // ---------------------------------------------------------------
+  function renderExecPrompt(){
+    const row = document.createElement('div');
+    row.className = 'line';
+    row.innerHTML = '<span class="prompt">$ </span><button class="exec" id="btn-exec">ejecutar acceso.exe</button>';
+    term.appendChild(row);
+    panel.scrollTop = panel.scrollHeight;
+    document.getElementById('btn-exec').addEventListener('click', function(e){
+      e.stopPropagation();
+      openPortal();
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // CIERRE DRAMÁTICO + APERTURA DEL PORTAL
+  // ---------------------------------------------------------------
+  function openPortal(){
+    panel.classList.add('crt-off');
+    setTimeout(function(){
+      panel.style.display = 'none';
+      portal.style.display = 'flex';
+      const ring = portal.querySelector('.portal-ring');
+      ring.classList.add('spin');
+      setTimeout(function(){
+        portalCard.classList.add('in');
+        setTimeout(function(){
+          document.getElementById('p-name').focus();
+        }, 500);
+      }, 150);
+    }, reduceMotion ? 0 : 550);
+  }
+
+  const commitInput = document.getElementById('p-commit');
+  const commitVal = document.getElementById('p-commit-val');
+  commitInput.addEventListener('input', function(){
+    commitVal.textContent = commitInput.value;
+  });
+
+  // ---------------------------------------------------------------
+  // CAPTURA: formulario único dentro del portal
+  // ---------------------------------------------------------------
+  const data = { name:'', email:'', consent:false, phone:'', age:'', commitment:'' };
+
+  document.getElementById('form-portal').addEventListener('submit', function(e){
+    e.preventDefault();
+    const name = document.getElementById('p-name').value.trim();
+    const email = document.getElementById('p-email').value.trim();
+    const phone = document.getElementById('p-phone').value.trim();
+    const age = document.getElementById('p-age').value.trim();
+    const consent = document.getElementById('p-consent').checked;
+    const err = document.getElementById('p-error');
+    const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+    if(name.length < 2){ err.textContent = 'introduce tu nombre.'; return; }
+    if(!validEmail){ err.textContent = 'introduce un email válido.'; return; }
+    if(phone.replace(/[\s-]/g,'').length < 9){ err.textContent = 'introduce un teléfono válido.'; return; }
+    if(!age || age < 14 || age > 99){ err.textContent = 'introduce una edad válida.'; return; }
+    if(!consent){ err.textContent = 'tienes que aceptar la política de privacidad.'; return; }
+
+    err.textContent = '';
+    data.name = name; data.email = email; data.phone = phone;
+    data.age = age; data.commitment = commitInput.value; data.consent = consent;
+
+    finish();
+  });
+
+  const TELEGRAM_URL = 'https://t.me/+Pg1EJRHAqyVkYmQ8';
+
+  function finish(){
+    submitLead(data);
+    portalCard.innerHTML =
+      '<p class="portal-eyebrow">acceso concedido</p>' +
+      '<h2 class="portal-title">bienvenido, ' + escapeHtml(data.name) + '.</h2>' +
+      '<p style="color:var(--muted); font-size:14px; line-height:1.7;">' +
+      'te estamos llevando a The Build Club...<br><br>' +
+      'si no se abre solo, entra aquí:</p>' +
+      '<a class="btn-portal" style="display:block; text-decoration:none; text-align:center; margin-top:14px;" href="' + TELEGRAM_URL + '" target="_blank" rel="noopener">entrar a The Build Club</a>';
+    setTimeout(function(){
+      window.location.href = TELEGRAM_URL;
+    }, 1800);
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ------------------------------------------------------------------
+  // ENVÍO DEL LEAD — cada envío llega como mensaje de Telegram al bot.
+  // Nota de seguridad: el token del bot queda visible en el código
+  // fuente de esta página pública. El único riesgo es que alguien
+  // podría usarlo para mandar mensajes falsos a este chat con el bot;
+  // no puede leer tus otros chats ni acceder a nada más de tu cuenta.
+  // ------------------------------------------------------------------
+  const TELEGRAM_BOT_TOKEN = '8971975479:AAEfPTknK4-hkyMmTpVBBNszKjzbUaEurEc';
+  const TELEGRAM_CHAT_ID = '8265043170';
+
+  function submitLead(payload){
+    console.log('Lead capturado:', payload);
+    const text =
+      '🔥 Nuevo lead — The Build Club\n' +
+      'Nombre: ' + payload.name + '\n' +
+      'Email: ' + payload.email + '\n' +
+      'Teléfono: ' + payload.phone + '\n' +
+      'Edad: ' + payload.age + '\n' +
+      'Compromiso: ' + payload.commitment + '%';
+
+    const url = 'https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN +
+      '/sendMessage?chat_id=' + encodeURIComponent(TELEGRAM_CHAT_ID) +
+      '&text=' + encodeURIComponent(text);
+
+    fetch(url, { method: 'GET', mode: 'no-cors' })
+      .catch(function(err){
+        console.log('Error enviando a Telegram:', err);
+      });
+  }
+})();
+</script>
+
+</body>
+</html>
